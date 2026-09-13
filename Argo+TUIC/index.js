@@ -197,7 +197,7 @@ async function main() {
   const singboxTarUrl = `https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-${isArm ? "arm64" : "amd64"}.tar.gz`;
 
   if (!fs.existsSync(webPath)) {
-    log("[下载] 正在拉取 sing-box 核心...");
+    log("[下载] 正在下载 sing-box ...");
     const tempTar = path.join(FILE_PATH, "singbox.tar.gz");
     await downloadFile(singboxTarUrl, tempTar);
     extractSingbox(tempTar, webPath);
@@ -286,7 +286,7 @@ async function main() {
   if (enableArgo) {
     const cloudflaredUrl = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${isArm ? "arm64" : "amd64"}`;
     if (!fs.existsSync(botPath)) {
-      log("[下载] 正在拉取 Cloudflared...");
+      log("[下载] 正在下载 Cloudflared...");
       await downloadFile(cloudflaredUrl, botPath);
     }
     fs.chmodSync(botPath, 0o775);
