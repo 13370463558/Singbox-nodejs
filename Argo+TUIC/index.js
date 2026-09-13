@@ -37,7 +37,7 @@ const { spawn, execSync } = require("child_process");
 const iataMap = {
   HKG: "香港", TPE: "台湾", NRT: "日本", HND: "日本", KIX: "日本",
   ICN: "韩国", SIN: "新加坡", BKK: "泰国", MNL: "菲律宾", SGN: "越南",
-  LAX: "美国", SJC: "美国", SEA: "美国", JFK: "美国", ORD: "美国",
+  LAX: "美国", DFW: "美国", SJC: "美国", SEA: "美国", JFK: "美国", ORD: "美国",
   LHR: "英国", FRA: "德国", CDG: "法国", AMS: "荷兰", HEL: "芬兰"
 };
 
