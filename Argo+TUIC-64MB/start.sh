@@ -4,18 +4,13 @@ cd "$(dirname "$0")"
 
 chmod +x ./index.js 2>/dev/null || true
 
-if [ ! -d "node_modules" ] && [ -f "package.json" ]; then
-    echo "[INFO] 正在安装 Node.js 依赖..."
-    npm install --production --no-audit --no-fund
-fi
-
 mkdir -p .tmp
 
 echo "[INFO] 启动 Argo + TUIC 主程序 (index.js)..."
 
 while true; do
 
-    node --max-old-space-size=16 index.js
+    node --max-old-space-size=32 index.js
     
     EXIT_CODE=$?
     
