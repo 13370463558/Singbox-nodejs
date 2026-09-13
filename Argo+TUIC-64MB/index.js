@@ -315,13 +315,11 @@ async function main() {
 
   let outputLinks = [];
 
-  // 1. 生成 TUIC 节点
   if (TUIC_PORT.trim() !== "") {
     const tuicNodeLink = `tuic://${UUID}:${TUIC_PASS}@${serverIP}:${TUIC_PORT}?congestion_control=bbr&alpn=h3&sni=bing.com&allow_insecure=1#TUIC_${NAME}_${SHORT_UUID}`;
     outputLinks.push(tuicNodeLink);
   }
 
-  // 2. 生成 Argo VLESS 节点
   if (ARGO_PORT.trim() !== "" && domain) {
     const plainNodeLink = `vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&sni=${domain}&fp=chrome&type=ws&host=${domain}&path=${WS_PATH}#Argo_${NAME}_${SHORT_UUID}`;
     outputLinks.push(plainNodeLink);
@@ -331,20 +329,17 @@ async function main() {
     const rawLinksString = outputLinks.join("\n");
     const base64Sub = Buffer.from(rawLinksString, "utf-8").toString("base64");
 
-    // 1. 部署控制台：仅输出 Base64 节点
     log(`\n====================== Base64 节点 ==========================\n${base64Sub}\n==============================================================\n`);
 
-    // 2. 拼接面板开放端口的 HTTP 订阅链接
     const portSuffix = (WEB_PORT && WEB_PORT !== "80") ? `:${WEB_PORT}` : "";
     const httpSubUrl = `http://${serverIP}${portSuffix}/${URL_FILE_PATH}`;
 
-    // 3. 构造 sub.txt 内容：Base64 节点（置顶） + HTTP 订阅链接
     const subFileContent = `====================== Base64 节点 ==========================\n${base64Sub}\n\n====================== HTTP 订阅链接 ========================\n${httpSubUrl}\n==============================================================\n`;
 
     try {
       const subPath = path.isAbsolute(URL_FILE_PATH) ? URL_FILE_PATH : path.resolve(process.cwd(), URL_FILE_PATH);
       fs.writeFileSync(subPath, subFileContent, "utf-8");
-      log(`[成功] Base64 节点与 HTTP 订阅链接已保存写入: ${subPath}`);
+      log(`[链接] Base64/订阅 已写入: ${subPath}`);
     } catch (e) {
       log(`[错误] 写入 ${URL_FILE_PATH} 失败: ${e.message}`);
     }
