@@ -1,13 +1,24 @@
 #!/usr/bin/env node
 
-// ====================== 基础配置区 ======================
-const TUIC_PORT = process.env.TUIC_PORT || "";                   // TUIC 端口（留空/0 不部署）
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                     // Argo 回源端口（留空/0 不部署）
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";           // http2 或 quic
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";        // 隧道连接数
+// ====================== Argo + TUIC 变量设置区域 开始 ======================
+
+const TUIC_PORT = process.env.TUIC_PORT || "";                       // TUIC 端口 （留空=不部署）
+
+
+const ARGO_PORT = process.env.ARGO_PORT || "";                       // Argo回源端口填入8001 （留空=不部署）
+
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";           // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";        // 隧道连接数量 建议http2=4，quic=1 （多条UDP可能会触发机房QoS）
+
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                   // 固定隧道域名
+
 const ARGO_AUTH = process.env.ARGO_AUTH || "";                       // 固定隧道 Token
-const CFIP = process.env.CFIP || "www.wto.org";                      // 优选域名/IP
+
+const CFIP = process.env.CFIP || "www.wto.org";                      // 优选域名/IP （www.visa.com.hk  usa.visa.com  www.shopify.com) 
+
+// ====================== Argo + TUIC 变量设置区域 完成 ======================
+
 const CFPORT = process.env.CFPORT || 443;                             
 const SUB_PORT = process.env.SUB_PORT;
 
@@ -23,7 +34,6 @@ const crypto = require("crypto");
 const readline = require("readline");
 const { spawn, execSync } = require("child_process");
 
-// 常用 CDN 三字代码到国家/地区的映射字典
 const iataMap = {
   HKG: "香港", TPE: "台湾", NRT: "日本", HND: "日本", KIX: "日本",
   ICN: "韩国", SIN: "新加坡", BKK: "泰国", MNL: "菲律宾", SGN: "越南",
@@ -31,7 +41,6 @@ const iataMap = {
   LHR: "英国", FRA: "德国", CDG: "法国", AMS: "荷兰", HEL: "芬兰"
 };
 
-// 动态内存与 CPU 资源阶梯计算
 const totalMemMB = Math.round(os.totalmem() / 1024 / 1024);
 let singboxMemLimit, cloudflaredMemLimit, dynamicGOGC, dynamicProcs;
 
@@ -79,7 +88,6 @@ if (!fs.existsSync(FILE_PATH)) fs.mkdirSync(FILE_PATH, { recursive: true });
 const uuidFilePath = path.join(FILE_PATH, "uuid.txt");
 const tuicPwdFilePath = path.join(FILE_PATH, "tuic_password.txt");
 
-// 1. 读取/生成 TUIC 密码与 UUID
 let rawTuicPassword = process.env.TUIC_PASSWORD || (fs.existsSync(tuicPwdFilePath) && fs.readFileSync(tuicPwdFilePath, "utf-8").trim());
 if (!rawTuicPassword) {
   rawTuicPassword = crypto.randomBytes(16).toString("hex");
@@ -96,7 +104,6 @@ const UUID = rawUUID.toLowerCase();
 const WS_PATH = `/${UUID}-vless`;
 const log = (msg) => process.stdout.write(msg + "\n");
 
-// 通用网络与文件工具函数
 function downloadFile(urlStr, targetPath) {
   return new Promise((resolve, reject) => {
     const client = urlStr.startsWith("https") ? https : http;
@@ -158,13 +165,11 @@ async function main() {
     process.exit(0);
   }
 
-  // 1. 清理冲突进程
   try { execSync("pkill -9 -f sing-box", { stdio: "ignore" }); } catch (e) {}
   try { execSync("pkill -9 -f cloudflared", { stdio: "ignore" }); } catch (e) {}
   if (SUB_PORT) { try { execSync(`fuser -k -9 ${SUB_PORT}/tcp`, { stdio: "ignore" }); } catch (e) {} }
   if (TUIC_PORT) { try { execSync(`fuser -k -9 ${TUIC_PORT}/udp`, { stdio: "ignore" }); } catch (e) {} }
 
-  // 2. 组装 sing-box 入站配置
   const inbounds = [];
   if (enableArgo) {
     inbounds.push({
@@ -187,7 +192,6 @@ async function main() {
     outbounds: [{ type: "direct", tag: "direct", udp_fragment: true }]
   }, null, 2));
 
-  // 3. 下载与启动 sing-box
   const isArm = ["arm", "arm64", "aarch64"].includes(os.arch());
   const SINGBOX_VER = "1.11.4";
   const singboxTarUrl = `https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-${isArm ? "arm64" : "amd64"}.tar.gz`;
@@ -219,7 +223,6 @@ async function main() {
   const subPortInt = parseInt(rawPort, 10);
   const isValidSubPort = !isNaN(subPortInt) && subPortInt > 0 && subPortInt <= 65535;
 
-  // 4. Base64 订阅节点信息输出模块
   const updateSubFile = () => {
     const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
     const rawLinksText = rawLinksArr.join("\r\n");
@@ -240,7 +243,7 @@ async function main() {
 
     try {
       fs.writeFileSync(URL_FILE_PATH, fileOutputContent, "utf-8");
-      log(`[链接] 信息已写入: ${URL_FILE_PATH}`);
+      log(`[链接] Base64/订阅 已写入: ${URL_FILE_PATH}`);
     } catch (e) {
       log(`[存储] 写入文件失败: ${e.message}`);
     }
@@ -251,7 +254,6 @@ async function main() {
     tuicNodeLink = `tuic://${UUID}:${TUIC_PASSWORD}@${publicIP}:${TUIC_PORT}?sni=www.bing.com&alpn=h3&congestion_control=bbr&allowInsecure=1#TUIC_Easyshare`;
   }
 
-  // 5. 启动 HTTP 动态订阅端口服务
   if (isValidSubPort) {
     const server = http.createServer((req, res) => {
       if (req.url === `/${UUID}`) {
@@ -274,13 +276,12 @@ async function main() {
     });
 
     server.listen(subPortInt, () => {
-      log(`[订阅服务] 动态 HTTP 订阅已开启`);
+      log(`[订阅服务] 订阅已启用`);
     }).on("error", (err) => {
       log(`[订阅服务] 启动失败: ${err.message}`);
     });
   }
 
-  // 6. 启动 Cloudflared 隧道与 4 条 Connections 连入日志分析
   let botProc = null;
   if (enableArgo) {
     const cloudflaredUrl = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${isArm ? "arm64" : "amd64"}`;
@@ -311,20 +312,17 @@ async function main() {
     });
 
     let hasOutput = false;
-    // 使用 Map 维护每一条连接 (connIndex -> nodeLocation)
     const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
     rl.on("line", (chunk) => {
       const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
 
-      // 捕获临时隧道域名
       if (!isFixedTunnel && !hasOutput) {
         const domainMatch = cleanLine.match(/https:\/\/([a-zA-Z0-9-]+\.trycloudflare\.com)/);
         if (domainMatch) setArgoLink(domainMatch[1]);
       }
 
-      // 提取连入日志中的 connIndex 和 location 机房代码
       const connMatch = cleanLine.match(/connIndex=(\d+)/i) || cleanLine.match(/"connIndex":(\d+)/i);
       const locMatch = cleanLine.match(/(?:location|region)["=:\s]+([a-zA-Z0-9]{3,4})/i) ||
                         cleanLine.match(/Registered tunnel connection.*?\b([A-Z0-9]{3,4})\b/i);
@@ -333,7 +331,6 @@ async function main() {
         const rawCode = locMatch[1].toUpperCase();
         const iataCode = rawCode.replace(/[0-9]/g, "");
         const country = iataMap[iataCode] || iataCode;
-        // 自动分配 ID 或获取日志确切 connIndex
         const connId = connMatch ? connMatch[1] : String(activeConnectionsMap.size);
 
         if (!hasOutput) {
@@ -341,7 +338,6 @@ async function main() {
           hasOutput = true;
         }
 
-        // 记录每一条单独的 Connection 并逐条打印输出
         if (!activeConnectionsMap.has(connId)) {
           activeConnectionsMap.set(connId, rawCode);
           log(`[Cloudflare CDN] 已连接边缘节点：${rawCode}（${country}） | 协议：${ARGO_PROTOCOL.toLowerCase()}`);
@@ -349,7 +345,6 @@ async function main() {
       }
     });
 
-    // 兜底保底输出
     setTimeout(() => {
       if (!hasOutput) {
         updateSubFile();
@@ -361,7 +356,6 @@ async function main() {
     updateSubFile();
   }
 
-  // 进程统一退出清理
   const cleanup = () => {
     try { if (webProc) webProc.kill("SIGKILL"); } catch (e) {}
     try { if (botProc) botProc.kill("SIGKILL"); } catch (e) {}
