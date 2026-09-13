@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 
-// ====================== 环境变量设置开始 ======================
+// ====================== Argo + TUIC 变量设置区域 开始 ======================
 
 const TUIC_PORT = process.env.TUIC_PORT || "";                 // TUIC 端口（留空=不部署）
 
@@ -17,7 +17,7 @@ const ARGO_AUTH = process.env.ARGO_AUTH || "";                 // 固定隧道 T
 
 const CFIP = process.env.CFIP || "www.wto.org";                // 优选 IP/域名
 
-// ====================== 环境变量设置完成 ======================
+// ====================== Argo + TUIC 变量设置区域 完成 ======================
 
 const CFPORT = process.env.CFPORT || 443;
 const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "";
