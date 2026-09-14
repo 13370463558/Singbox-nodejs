@@ -1,27 +1,29 @@
 #!/usr/bin/env node
 
-// ====================== Argo + TUIC 变量设置 开始 ======================
+// =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC端口（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                               // TUIC 端口（留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                            // Argo回源端口填入8001 （留空=不部署）
+const ARGO_PORT = process.env.ARGO_PORT || "8001";                           // Argo回源端口填入8001 （留空=不部署）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                   // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2<8，quic=1 （多条UDP可能会触发机房QoS）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            // 固定隧道域名
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                           // 固定隧道域名
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                                // 固定隧道 Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "";                               // 固定隧道 Token
 
-const CFIP = process.env.CFIP || "www.visa.com.hk";                           // 优选域名/IP （www.wto.org  usa.visa.com  www.shopify.com) 
+const CFIP = process.env.CFIP || "www.visa.com.hk";                          // 优选域名/IP（ www.wto.org  usa.visa.com  www.shopify.com) 
 
 // ============================ 变量设置完成 ===============================
 
 const CFPORT = process.env.CFPORT || 443;
 const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
+
 const FILE_PATH = process.env.FILE_PATH || ".tmp";
 const URL_FILE_PATH = process.env.URL_FILE_PATH || "sub.txt";
+
 const http = require("http");
 const https = require("https");
 const os = require("os");
@@ -120,7 +122,7 @@ let webProc = null;
 let botProc = null;
 let isExiting = false;
 
-// ----------------- Sing-box 启动与保活 -----------------
+
 async function startSingbox() {
   if (isExiting) return;
   try {
@@ -141,7 +143,6 @@ async function startSingbox() {
       detached: true
     });
 
-    // 5 秒后删除二进制文件并提示存储优化
     setTimeout(() => {
       if (fs.existsSync(webPath)) {
         try { 
@@ -153,8 +154,10 @@ async function startSingbox() {
 
     webProc.on("exit", (code, signal) => {
       if (isExiting) return;
-      log(`[警告] sing-box 进程意外退出 (code: ${code}, signal: ${signal})，3秒后自动拉起保活...`);
-      setTimeout(startSingbox, 3000);
+      log(`[警告] sing-box 意外退出 (code: ${code})，3秒后自动重新下载并拉起保活...`);
+      setTimeout(() => {
+        startSingbox().catch(e => log(`[保活错误] ${e.message}`));
+      }, 3000);
     });
 
   } catch (err) {
@@ -162,6 +165,7 @@ async function startSingbox() {
     if (!isExiting) setTimeout(startSingbox, 5000);
   }
 }
+
 
 async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubFile) {
   if (isExiting) return;
@@ -171,6 +175,7 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
       await downloadFile(cloudflaredUrl, botPath);
     }
     fs.chmodSync(botPath, 0o775);
+
 
     if (!isFixedTunnel) {
       log("未检测到 Token，启动临时隧道...");
@@ -186,7 +191,7 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
     const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
-    rl.on("line", (chunk) => {
+    const onLineHandler = (chunk) => {
       const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
 
       if (!isFixedTunnel) {
@@ -194,6 +199,9 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
         if (domainMatch) {
           setArgoLink(domainMatch[1]);
           updateSubFile(true);
+            
+          rl.close();
+          try { botProc.stderr.unref(); } catch (e) {}
         }
       }
 
@@ -212,7 +220,16 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
           log(`[Cloudflare CDN] 已连接边缘节点：${rawCode}（${country}） | 协议：${ARGO_PROTOCOL.toLowerCase()}`);
         }
       }
-    });
+    };
+
+    rl.on("line", onLineHandler);
+
+    setTimeout(() => {
+      try {
+        rl.close();
+        if (botProc && botProc.stderr) botProc.stderr.unref();
+      } catch (e) {}
+    }, 60000);
 
     botProc.on("exit", (code, signal) => {
       if (isExiting) return;
@@ -282,6 +299,7 @@ async function main() {
 
     let subFileFormatted = consoleFormatted;
     if (isValidSubPort) {
+
       subFileFormatted += `\n\nhttps安全订阅链接:\nhttps://${getPublicIP()}:${subPortInt}/${UUID}`;
     }
 
@@ -320,7 +338,9 @@ async function main() {
     }
   }
 
+
   if (isValidSubPort) {
+
     generateCertificates(keyPath, certPath);
 
     const httpsOptions = {
@@ -333,7 +353,13 @@ async function main() {
         const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
         if (rawLinksArr.length > 0) {
           res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
-          res.end(Buffer.from(rawLinksArr.join("\r\n")).toString("base64"));
+     
+          const subContent = Buffer.from(rawLinksArr.join("\r\n")).toString("base64");
+          res.end(subContent);
+    
+          if (global.gc) {
+            try { global.gc(); } catch (e) {}
+          }
         } else {
           res.writeHead(404); res.end("Not Ready");
         }
