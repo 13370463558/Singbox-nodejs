@@ -8,9 +8,12 @@ mkdir -p .tmp
 
 echo "[INFO] 启动 Argo + TUIC 主程序 (index.js)..."
 
+
+export MALLOC_ARENA_MAX=2
+
 while true; do
 
-    node --max-old-space-size=32 index.js
+    node --max-old-space-size=24 index.js
     
     EXIT_CODE=$?
     
