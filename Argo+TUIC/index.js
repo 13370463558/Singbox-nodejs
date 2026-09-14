@@ -8,7 +8,7 @@ const ARGO_PORT = process.env.ARGO_PORT || "8001";                          // A
 
 const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                  // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";               // 隧道连接数量 建议http2<8，quic=1 （多条UDP可能会触发机房QoS）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";               // 隧道连接数量 建议http2=4，quic=1 （多条UDP可能会触发机房QoS）
 
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                          // 固定隧道域名
 
@@ -335,36 +335,27 @@ async function main() {
       stdio: ["ignore", "pipe", "pipe"], detached: true
     });
 
-    const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
-    rl.on("line", (chunk) => {
-      const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
-
-      if (!isFixedTunnel) {
+    if (isFixedTunnel) {
+      rl.close();
+    } else {
+      rl.on("line", (chunk) => {
+        const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
         const domainMatch = cleanLine.match(/https:\/\/([a-zA-Z0-9-]+\.trycloudflare\.com)/);
+        
         if (domainMatch) {
           setArgoLink(domainMatch[1]);
           updateSubFile();
+          
+          rl.close();
         }
-      }
-
-      const connMatch = cleanLine.match(/connIndex=(\d+)/i) || cleanLine.match(/"connIndex":(\d+)/i);
-      const locMatch = cleanLine.match(/(?:location|region)["=:\s]+([a-zA-Z0-9]{3,4})/i) ||
-                        cleanLine.match(/Registered tunnel connection.*?\b([A-Z0-9]{3,4})\b/i);
-
-      if (locMatch) {
-        const rawCode = locMatch[1].toUpperCase();
-        const iataCode = rawCode.replace(/[0-9]/g, "");
-        const country = iataMap[iataCode] || iataCode;
-        const connId = connMatch ? connMatch[1] : String(activeConnectionsMap.size);
-
-        if (!activeConnectionsMap.has(connId)) {
-          activeConnectionsMap.set(connId, rawCode);
-          log(`[Cloudflare CDN] 已连接边缘节点：${rawCode}（${country}） | 协议：${ARGO_PROTOCOL.toLowerCase()}`);
-        }
-      }
-    });
+      });
+    }
+    
+    setTimeout(() => {
+      try { rl.close(); } catch (e) {}
+    }, 60000);
 
   } else {
     updateSubFile();
