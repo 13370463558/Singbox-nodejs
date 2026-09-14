@@ -1,4 +1,4 @@
-## 📦 翼龙面板 Node.js 环境部署指南（低配置64MB或100MB内存）
+## 📦 翼龙面板 Node.js 环境部署指南（内存64MB：Freecloudpanel）
 
 ### ✨ 核心特性
 * **极致内存压缩**：专为 64MB 内存环境（如 FreeCloudPanel）深度定制，压榨极限性能。
