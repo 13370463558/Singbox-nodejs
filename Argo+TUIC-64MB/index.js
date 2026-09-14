@@ -197,7 +197,6 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
         if (domainMatch) {
           setArgoLink(domainMatch[1]);
           updateSubFile(true);
-            
           rl.close();
           try { botProc.stderr.unref(); } catch (e) {}
         }
@@ -351,10 +350,8 @@ async function main() {
         const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
         if (rawLinksArr.length > 0) {
           res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
-     
           const subContent = Buffer.from(rawLinksArr.join("\r\n")).toString("base64");
           res.end(subContent);
-    
           if (global.gc) {
             try { global.gc(); } catch (e) {}
           }
@@ -363,10 +360,9 @@ async function main() {
         }
       } else {
         res.writeHead(404); res.end("404");
-      }
+     } 
     }).listen(subPortInt, () => log("[订阅服务] https安全订阅已启用"));
-  }
-
+  } 
   if (!enableArgo) {
     updateSubFile();
   }
@@ -381,5 +377,4 @@ async function main() {
   process.on("SIGTERM", cleanup);
   process.stdin.resume();
 }
-
 main().catch((err) => { log(`[错误] ${err.message}`); process.exit(1); });
