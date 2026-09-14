@@ -1,30 +1,27 @@
 #!/usr/bin/env node
 
-// ====================== Argo + TUIC 变量设置区域 开始 ======================
+// =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                       // TUIC 端口 （留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                              // TUIC 端口 （留空=不部署）
 
+const ARGO_PORT = process.env.ARGO_PORT || "    ";                          // Argo回源端口填入8001 （留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "";                       // Argo回源端口填入8001 （留空=不部署）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                  // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";           // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";               // 隧道连接数量 建议http2=4，quic=1 （多条UDP可能会触发机房QoS）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";        // 隧道连接数量 建议http2=4，quic=1 （多条UDP可能会触发机房QoS）
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                          // 固定隧道域名
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                   // 固定隧道域名
+const ARGO_AUTH = process.env.ARGO_AUTH || "";                              // 固定隧道 Token
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                       // 固定隧道 Token
+const CFIP = process.env.CFIP || "www.wto.org";                             // 优选域名/IP （www.visa.com.hk  usa.visa.com  www.shopify.com) 
 
-const CFIP = process.env.CFIP || "www.wto.org";                      // 优选域名/IP （www.visa.com.hk  usa.visa.com  www.shopify.com) 
-
-// ====================== Argo + TUIC 变量设置区域 完成 ======================
+// ============================ 变量设置完成 ===============================
 
 const CFPORT = process.env.CFPORT || 443;                             
-const SUB_PORT = process.env.SUB_PORT;
-
+const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
 const FILE_PATH = process.env.FILE_PATH || ".tmp";
 const URL_FILE_PATH = process.env.URL_FILE_PATH || "sub.txt"; 
-
 const http = require("http");
 const https = require("https");
 const os = require("os");
@@ -146,7 +143,17 @@ function generateCertificates(keyPath, certPath) {
     execSync(`openssl ecparam -genkey -name prime256v1 -out "${keyPath}" 2>/dev/null && openssl req -new -x509 -days 3650 -key "${keyPath}" -out "${certPath}" -subj "/CN=bing.com" 2>/dev/null`);
     fs.chmodSync(keyPath, 0o600);
   } catch (e) {
-    log("[警告] OpenSSL 生成自签名证书失败，请确保系统已安装 openssl");
+    try {
+      const { generateKeyPairSync } = crypto;
+      const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+      const pemKey = privateKey.export({ type: 'pkcs8', format: 'pem' });
+      fs.writeFileSync(keyPath, pemKey);
+      fs.chmodSync(keyPath, 0o600);
+
+      execSync(`openssl req -new -x509 -days 3650 -key "${keyPath}" -out "${certPath}" -subj "/CN=bing.com" 2>/dev/null`);
+    } catch (err) {
+      log("[警告] 证书生成异常: " + err.message);
+    }
   }
 }
 
@@ -170,6 +177,8 @@ async function main() {
   if (SUB_PORT) { try { execSync(`fuser -k -9 ${SUB_PORT}/tcp`, { stdio: "ignore" }); } catch (e) {} }
   if (TUIC_PORT) { try { execSync(`fuser -k -9 ${TUIC_PORT}/udp`, { stdio: "ignore" }); } catch (e) {} }
 
+  generateCertificates(keyPath, certPath);
+
   const inbounds = [];
   if (enableArgo) {
     inbounds.push({
@@ -178,7 +187,6 @@ async function main() {
     });
   }
   if (enableTuic) {
-    generateCertificates(keyPath, certPath);
     inbounds.push({
       type: "tuic", tag: "tuic-in", listen: "::", listen_port: parseInt(TUIC_PORT),
       users: [{ uuid: UUID, password: TUIC_PASSWORD }], congestion_control: "bbr",
@@ -197,7 +205,7 @@ async function main() {
   const singboxTarUrl = `https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-${isArm ? "arm64" : "amd64"}.tar.gz`;
 
   if (!fs.existsSync(webPath)) {
-    log("[下载] 正在下载 sing-box ...");
+    log("正在下载 sing-box ...");
     const tempTar = path.join(FILE_PATH, "singbox.tar.gz");
     await downloadFile(singboxTarUrl, tempTar);
     extractSingbox(tempTar, webPath);
@@ -223,27 +231,35 @@ async function main() {
   const subPortInt = parseInt(rawPort, 10);
   const isValidSubPort = !isNaN(subPortInt) && subPortInt > 0 && subPortInt <= 65535;
 
+  let printedOnce = false;
+
   const updateSubFile = () => {
+    if (enableArgo && !argoNodeLink) return;
+    if (enableTuic && !tuicNodeLink) return;
+
     const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
     const rawLinksText = rawLinksArr.join("\r\n");
     if (!rawLinksText) return;
-    
+
     const base64Sub = Buffer.from(rawLinksText).toString("base64");
-    
+
     let fileOutputContent = base64Sub;
     if (isValidSubPort) {
       const publicIP = getPublicIP();
-      const httpSubUrl = `http://${publicIP}:${subPortInt}/${UUID}`;
-      fileOutputContent += `\n\nHTTP 订阅链接:\n${httpSubUrl}`;
+      const httpsSubUrl = `https://${publicIP}:${subPortInt}/${UUID}`;
+      fileOutputContent += `\n\nHTTPS 订阅链接:\n${httpsSubUrl}`;
     }
 
-    const topDivider    = "====================== Base64 链接 ==========================";
-    const bottomDivider = "==============================================================";
-    log(`\n${topDivider}\n${base64Sub}\n${bottomDivider}`);
+    if (!printedOnce) {
+      const topDivider    = "====================== Base64链接 ==========================";
+      const bottomDivider = "==============================================================";
+      log(`\n${topDivider}\n${base64Sub}\n${bottomDivider}`);
+      printedOnce = true;
+    }
 
     try {
       fs.writeFileSync(URL_FILE_PATH, fileOutputContent, "utf-8");
-      log(`[链接] Base64/订阅 已写入: ${URL_FILE_PATH}`);
+      log(`[链接] Base64/https安全订阅 已写入: ${URL_FILE_PATH}`);
     } catch (e) {
       log(`[存储] 写入文件失败: ${e.message}`);
     }
@@ -255,7 +271,12 @@ async function main() {
   }
 
   if (isValidSubPort) {
-    const server = http.createServer((req, res) => {
+    const options = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath)
+    };
+
+    const server = https.createServer(options, (req, res) => {
       if (req.url === `/${UUID}`) {
         const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
         if (rawLinksArr.length > 0) {
@@ -276,7 +297,7 @@ async function main() {
     });
 
     server.listen(subPortInt, () => {
-      log(`[订阅服务] 订阅已启用`);
+      log(`[订阅服务] https安全订阅已启用`);
     }).on("error", (err) => {
       log(`[订阅服务] 启动失败: ${err.message}`);
     });
@@ -286,7 +307,7 @@ async function main() {
   if (enableArgo) {
     const cloudflaredUrl = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${isArm ? "arm64" : "amd64"}`;
     if (!fs.existsSync(botPath)) {
-      log("[下载] 正在下载 Cloudflared...");
+      log("正在下载 Cloudflared...");
       await downloadFile(cloudflaredUrl, botPath);
     }
     fs.chmodSync(botPath, 0o775);
@@ -298,11 +319,14 @@ async function main() {
     };
 
     if (isFixedTunnel) {
-      log(`[Argo] 启动固定隧道...`);
+      log(`[Argo] 检测到Token，启动固定隧道...`);
       argoArgs.push("run", "--token", authTrim);
-      if (ARGO_DOMAIN.trim()) setArgoLink(ARGO_DOMAIN.trim());
+      if (ARGO_DOMAIN.trim()) {
+        setArgoLink(ARGO_DOMAIN.trim());
+        updateSubFile();
+      }
     } else {
-      log(`[Argo] 启动临时隧道...`);
+      log(`[Argo] 未检测到Token，启动临时隧道...`);
       argoArgs.push("--url", `http://127.0.0.1:${ARGO_PORT}`);
     }
 
@@ -311,16 +335,18 @@ async function main() {
       stdio: ["ignore", "pipe", "pipe"], detached: true
     });
 
-    let hasOutput = false;
     const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
     rl.on("line", (chunk) => {
       const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
 
-      if (!isFixedTunnel && !hasOutput) {
+      if (!isFixedTunnel) {
         const domainMatch = cleanLine.match(/https:\/\/([a-zA-Z0-9-]+\.trycloudflare\.com)/);
-        if (domainMatch) setArgoLink(domainMatch[1]);
+        if (domainMatch) {
+          setArgoLink(domainMatch[1]);
+          updateSubFile();
+        }
       }
 
       const connMatch = cleanLine.match(/connIndex=(\d+)/i) || cleanLine.match(/"connIndex":(\d+)/i);
@@ -333,24 +359,12 @@ async function main() {
         const country = iataMap[iataCode] || iataCode;
         const connId = connMatch ? connMatch[1] : String(activeConnectionsMap.size);
 
-        if (!hasOutput) {
-          updateSubFile();
-          hasOutput = true;
-        }
-
         if (!activeConnectionsMap.has(connId)) {
           activeConnectionsMap.set(connId, rawCode);
           log(`[Cloudflare CDN] 已连接边缘节点：${rawCode}（${country}） | 协议：${ARGO_PROTOCOL.toLowerCase()}`);
         }
       }
     });
-
-    setTimeout(() => {
-      if (!hasOutput) {
-        updateSubFile();
-        hasOutput = true;
-      }
-    }, 5000);
 
   } else {
     updateSubFile();
