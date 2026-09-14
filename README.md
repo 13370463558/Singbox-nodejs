@@ -9,7 +9,6 @@
 
 ## 1. 💡 http2/quic双模Argo + TUIC方案说明：
 
-### 🌐 http2/quic 双模Argo Tunnel + TUIC直连共存
 
 * **精简 Sing-box 架构**：内存自适应+极限精简优化，64MB极低内存也能稳定运行。
   
