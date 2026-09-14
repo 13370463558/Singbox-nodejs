@@ -145,7 +145,7 @@ async function startSingbox() {
       if (fs.existsSync(webPath)) {
         try { 
           fs.unlinkSync(webPath); 
-          log("[存储优化]  sing-box 保活中，web文件已清理"); 
+          log("[存储优化] sing-box 保活中，web文件已清理"); 
         } catch (e) {}
       }
     }, 5000);
