@@ -44,7 +44,7 @@ let singboxMemLimit, cloudflaredMemLimit, dynamicGOGC, dynamicProcs;
 if (totalMemMB <= 160) {
   singboxMemLimit = "38MiB";
   cloudflaredMemLimit = "65MiB";
-  dynamicGOGC = "180";     
+  dynamicGOGC = "100";     
   dynamicProcs = "1";     
 } else if (totalMemMB < 256) {
   singboxMemLimit = "80MiB";
