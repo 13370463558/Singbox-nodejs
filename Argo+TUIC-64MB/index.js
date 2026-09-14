@@ -14,7 +14,7 @@ const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            //
 
 const ARGO_AUTH = process.env.ARGO_AUTH || "";                                // 固定隧道 Token
 
-const CFIP = process.env.CFIP || "www.wto.org";                               // 优选域名/IP （www.visa.com.hk  usa.visa.com  www.shopify.com) 
+const CFIP = process.env.CFIP || "www.visa.com.hk";                           // 优选域名/IP （www.wto.org  usa.visa.com  www.shopify.com) 
 
 // ============================ 变量设置完成 ===============================
 
