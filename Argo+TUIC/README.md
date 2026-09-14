@@ -30,5 +30,5 @@
 
 > [!WARNING]
 > **连接数建议**
-> http2协议，并发连接数建议8以下。
-> quic协议，建议将并发连接数设为 `1`（`ARGO_CONNECTIONS=1`），多条quic可能会引发机房QoS。
+1.  http2协议，并发连接数建议8以下。
+2.  quic协议，建议将并发连接数设为 `1`（`ARGO_CONNECTIONS=1`），多条quic可能会引发机房QoS。
