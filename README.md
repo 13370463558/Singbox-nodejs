@@ -8,11 +8,12 @@
 
 ## 💡 特性与适用场景
 
-### 1. 🌐 http2/quic 双模Argo Tunnel 方案 (内网穿透与穿墙)
+### 1. 🌐 http2/quic 双模Argo Tunnel + TUIC方案
 
-
-* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、调整连接数量。
 * **精简 Sing-box 架构**：自适应+极限精简优化，64MB低内存环境也能稳定运行。
+  
+* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、连接数量可调整。
+
 * **启用https安全订阅**：避免http明文订阅的安全问题。
   
 * **📌 适用场景**：
@@ -20,7 +21,7 @@
   * 双模Argo：直连线路质量差、UDP 被 QoS 限速或阻断，服务器未开放公网端口。
   * TUIC：本地TCP拥塞严重、晚高峰时段。
 
-### Argo Tunnel-64MB Ram适用于64MB低内存环境，如Freecloudpanel。
+### 64MB低内存环境，如Freecloudpanel。
 
 ---
 
