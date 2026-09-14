@@ -22,7 +22,7 @@
   * 双模Argo：直连线路质量差、UDP 被 QoS 限速或阻断，服务器未开放公网端口。
   * TUIC：本地TCP拥塞严重、晚高峰时段。
 
-### 64MB低内存环境，如Freecloudpanel。
+### Argo+TUIC-64MB适用：64MB低内存环境，如Freecloudpanel。
 
 ---
 
