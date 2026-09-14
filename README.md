@@ -1,6 +1,6 @@
-# 🚀 1.http2/quic双模Argo + TUIC方案：IP被墙、抗封锁、晚高峰UDP直连 黄金组合
+# 1.http2/quic双模Argo + TUIC方案：IP被墙、抗封锁、晚高峰UDP直连 黄金组合
 
-# 🚀 2.直连 sing-box 三协议方案：高速、抗封锁直连（备选）
+# 2.直连 sing-box 三协议方案：高速、抗封锁直连（备选）
 
 ![简介与说明](https://img.shields.io/badge/%E7%AE%80%E4%BB%8B%E4%B8%8E%E8%AF%B4%E6%98%8E-Argo%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F%E3%80%81%E7%9B%B4%E8%BF%9EUDP%2BTCP%E9%83%A8%E7%BD%B2%E6%96%B9%E6%A1%88-red?style=flat-square)
 
