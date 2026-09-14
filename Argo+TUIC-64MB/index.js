@@ -189,6 +189,7 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
     const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
+    // ⚡ 抽出单独的处理逻辑，以便在拿到域名后第一时间彻底销毁监听器，切断晚高峰日志流
     const onLineHandler = (chunk) => {
       const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
 
@@ -197,6 +198,7 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
         if (domainMatch) {
           setArgoLink(domainMatch[1]);
           updateSubFile(true);
+          // ⚡【核心优化】拿到临时域名后，立刻关闭 readline，不再解析后续海量日志！
           rl.close();
           try { botProc.stderr.unref(); } catch (e) {}
         }
@@ -218,6 +220,15 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
         }
       }
     };
+
+    rl.on("line", onLineHandler);
+
+    setTimeout(() => {
+      try {
+        rl.close();
+        if (botProc && botProc.stderr) botProc.stderr.unref();
+      } catch (e) {}
+    }, 60000);
 
     rl.on("line", onLineHandler);
 
@@ -350,8 +361,10 @@ async function main() {
         const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
         if (rawLinksArr.length > 0) {
           res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
+          // ⚡ 生成响应内容
           const subContent = Buffer.from(rawLinksArr.join("\r\n")).toString("base64");
           res.end(subContent);
+          // ⚡ 订阅拉取完成后，主动清除可能残余的无用引用
           if (global.gc) {
             try { global.gc(); } catch (e) {}
           }
@@ -360,7 +373,7 @@ async function main() {
         }
       } else {
         res.writeHead(404); res.end("404");
-     } 
+      }
     }).listen(subPortInt, () => log("[订阅服务] https安全订阅已启用"));
   } 
   if (!enableArgo) {
