@@ -20,10 +20,8 @@ const CFIP = process.env.CFIP || "www.visa.com.hk";                          // 
 
 const CFPORT = process.env.CFPORT || 443;
 const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
-
 const FILE_PATH = process.env.FILE_PATH || ".tmp";
 const URL_FILE_PATH = process.env.URL_FILE_PATH || "sub.txt";
-
 const http = require("http");
 const https = require("https");
 const os = require("os");
