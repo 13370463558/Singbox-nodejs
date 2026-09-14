@@ -148,7 +148,7 @@ async function startSingbox() {
           log("[存储优化] sing-box 保活中，web文件已清理"); 
         } catch (e) {}
       }
-    }, 5000);
+    }, 10000);
 
     webProc.on("exit", (code, signal) => {
       if (isExiting) return;
