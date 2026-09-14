@@ -1,4 +1,4 @@
-# 🚀 http2/quic双模Argo Tunnel & 直连 sing-box部署方案
+# 🚀 http2/quic双模Argo + TUIC & 直连 sing-box部署方案
 
 ![简介与说明](https://img.shields.io/badge/%E7%AE%80%E4%BB%8B%E4%B8%8E%E8%AF%B4%E6%98%8E-Argo%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F%E3%80%81%E7%9B%B4%E8%BF%9EUDP%2BTCP%E9%83%A8%E7%BD%B2%E6%96%B9%E6%A1%88-red?style=flat-square)
 
@@ -11,12 +11,15 @@
 ### 1. 🌐 http2/quic 双模Argo Tunnel 方案 (内网穿透与穿墙)
 
 
-* **TCP/UDP双模**：隧道类型手动切换http2/quic、连接数可调。
-* **精简 Sing-box 架构**：极低资源占用。
-* **高稳定 Guardian 启动器**：内置 `start.sh` 内存与进程守护机制，精准控制垃圾回收（GC），在 64MB 低内存环境稳定运行。
+* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、调整连接数量。
+* **精简 Sing-box 架构**：自适应+极限精简优化，64MB低内存环境也能稳定运行。
+* **启用https安全订阅**：避免http明文订阅的安全问题。
+  
 * **📌 适用场景**：
-  * 直连线路质量差、UDP 被 QoS 限速或阻断。
-  * 服务器未开放公网端口。
+  
+  * 双模Argo：直连线路质量差、UDP 被 QoS 限速或阻断，服务器未开放公网端口。
+  * TUIC：本地TCP拥塞严重、晚高峰时段。
+
 ### Argo Tunnel-64MB Ram适用于64MB低内存环境，如Freecloudpanel。
 
 ---
