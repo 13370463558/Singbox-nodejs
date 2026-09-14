@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-// ====================== Argo + TUIC 变量设置区域 开始 ======================
+// ====================== Argo + TUIC 变量设置 开始 ======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC 端口（留空=不部署）
- 
-const ARGO_PORT = process.env.ARGO_PORT || "";                                // Argo回源端口填入8001（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC端口（留空=不部署）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic（http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_PORT = process.env.ARGO_PORT || "";                                // Argo回源端口填入8001 （留空=不部署）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2=4，quic=1 （多条UDP可能会触发机房QoS）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2<8，quic=1 （多条UDP可能会触发机房QoS）
 
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            // 固定隧道域名
 
@@ -16,13 +16,12 @@ const ARGO_AUTH = process.env.ARGO_AUTH || "";                                //
 
 const CFIP = process.env.CFIP || "www.wto.org";                               // 优选域名/IP （www.visa.com.hk  usa.visa.com  www.shopify.com) 
 
-// ====================== Argo + TUIC 变量设置区域 完成 ======================
+// ============================ 变量设置完成 ===============================
 
 const CFPORT = process.env.CFPORT || 443;
 const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
 const FILE_PATH = process.env.FILE_PATH || ".tmp";
 const URL_FILE_PATH = process.env.URL_FILE_PATH || "sub.txt";
-
 const http = require("http");
 const https = require("https");
 const os = require("os");
@@ -121,6 +120,7 @@ let webProc = null;
 let botProc = null;
 let isExiting = false;
 
+// ----------------- Sing-box 启动与保活 -----------------
 async function startSingbox() {
   if (isExiting) return;
   try {
@@ -141,14 +141,15 @@ async function startSingbox() {
       detached: true
     });
 
+    // 5 秒后删除二进制文件并提示存储优化
     setTimeout(() => {
       if (fs.existsSync(webPath)) {
         try { 
           fs.unlinkSync(webPath); 
-          log("[存储优化] sing-box 保活中，web文件已清理"); 
+          log("[存储优化]sing-box 保活中，web文件已清理"); 
         } catch (e) {}
       }
-    }, 10000);
+    }, 15000);
 
     webProc.on("exit", (code, signal) => {
       if (isExiting) return;
@@ -299,7 +300,6 @@ async function main() {
     tuicNodeLink = `tuic://${UUID}:${TUIC_PASSWORD}@${getPublicIP()}:${TUIC_PORT}?sni=www.bing.com&alpn=h3&congestion_control=bbr&allowInsecure=1#TUIC_Easyshare`;
   }
 
-  
   if (enableArgo) {
     let argoArgs = ["tunnel", "--no-autoupdate", "--protocol", ARGO_PROTOCOL.toLowerCase(), "--ha-connections", ARGO_CONNECTIONS];
     const setArgoLink = (domain) => {
@@ -314,11 +314,13 @@ async function main() {
     }
 
     await startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubFile);
+
+    if (isFixedTunnel) {
+      updateSubFile(true);
+    }
   }
 
-  
   if (isValidSubPort) {
-   
     generateCertificates(keyPath, certPath);
 
     const httpsOptions = {
