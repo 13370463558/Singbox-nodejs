@@ -30,7 +30,7 @@
 
   * **面板仅开放单端口**：可选 hy2+reality 或 tuic+reality不同组合。
     
-  * **面板开放了多端口（≥ 2个）**：支持一键同时部署 Hysteria2 + TUIC v5 + VLESS-REALITY。
+  * **面板开放多个端口（≥ 2个）**：支持一键同时部署 Hysteria2 + TUIC v5 + VLESS-REALITY。
     
 * **📌 适用场景**：
   
