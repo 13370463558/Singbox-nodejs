@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 
+
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC端口（留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                            // Argo回源端口填入8001（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                                  // TUIC端口（留空=不部署TUIC）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_PORT = process.env.ARGO_PORT || "8001";                              // Argo回源端口填入8001（留空=不部署Argo）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                      // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            // 固定隧道域名
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                   // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                                // 固定隧道Token
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                              // 固定隧道域名
 
-const CFIP = process.env.CFIP || "www.wto.org";                               // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
+const ARGO_AUTH = process.env.ARGO_AUTH || "";                                  // 固定隧道Token
+
+const CFIP = process.env.CFIP || "www.wto.org";                                 // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
+
 
 // ============================ 变量设置完成 ===============================
 
@@ -42,9 +45,9 @@ const totalMemMB = Math.round(os.totalmem() / 1024 / 1024);
 let singboxMemLimit, cloudflaredMemLimit, dynamicGOGC, dynamicProcs;
 
 if (totalMemMB <= 160) {
-  singboxMemLimit = "38MiB";
-  cloudflaredMemLimit = "65MiB";
-  dynamicGOGC = "80";     
+  singboxMemLimit = "35MiB";
+  cloudflaredMemLimit = "60MiB";
+  dynamicGOGC = "70";     
   dynamicProcs = "1";     
 } else if (totalMemMB < 256) {
   singboxMemLimit = "80MiB";
@@ -244,25 +247,27 @@ async function main() {
     const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
     const rawLinksText = rawLinksArr.join("\r\n");
     if (!rawLinksText) return;
-    const base64Sub = Buffer.from(rawLinksText).toString("base64");
+      const base64Sub = Buffer.from(rawLinksText).toString("base64");
 
     const topDivider    = "====================== Base64链接 ==========================";
     const bottomDivider = "==============================================================";
 
-    let fileOutputContent = `${topDivider}\n${base64Sub}`;
+    const consoleOutputContent = `${topDivider}\n${base64Sub}\n${bottomDivider}`;
+    
+    let fileOutputContent = consoleOutputContent;
     if (isValidSubPort) {
       const publicIP = getPublicIP();
       const httpsSubUrl = `https://${publicIP}:${subPortInt}/${UUID}`;
-      fileOutputContent += `\n\n${bottomDivider}\n\nhttps安全订阅链接:\n${httpsSubUrl}`;
+      fileOutputContent += `\n\nhttps安全订阅链接:\n${httpsSubUrl}`;
     }
 
     if (!printedOnce) {
-      log(`\n${fileOutputContent}`);
+      log(`\n${consoleOutputContent}`); // ✅ 控制台仅输出 Base64 内容
       printedOnce = true;
     }
 
     try {
-      fs.writeFileSync(URL_FILE_PATH, fileOutputContent, "utf-8");
+      fs.writeFileSync(URL_FILE_PATH, fileOutputContent, "utf-8"); // 📄 sub.txt 依然包含 HTTPS 安全订阅链接
       log(`[链接] Base64/https安全订阅 已写入: ${URL_FILE_PATH}`);
     } catch (e) {
       log(`[存储] 写入文件失败: ${e.message}`);
