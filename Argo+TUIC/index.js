@@ -2,23 +2,23 @@
 
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                              // TUIC 端口 （留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC端口（留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                          // Argo回源端口填入8001 （留空=不部署）
+const ARGO_PORT = process.env.ARGO_PORT || "8001";                            // Argo回源端口填入8001（留空=不部署）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                  // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";               // 隧道连接数量 建议http2=4，quic=1 （多条UDP可能会触发机房QoS）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                          // 固定隧道域名
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            // 固定隧道域名
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                              // 固定隧道 Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "";                                // 固定隧道Token
 
-const CFIP = process.env.CFIP || "www.wto.org";                             // 优选域名/IP （www.visa.com.hk  usa.visa.com  www.shopify.com) 
+const CFIP = process.env.CFIP || "www.wto.org";                               // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
 
 // ============================ 变量设置完成 ===============================
 
-const CFPORT = process.env.CFPORT || 443;                             
+const CFPORT = process.env.CFPORT || "443";                                
 const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
 const FILE_PATH = process.env.FILE_PATH || ".tmp";
 const URL_FILE_PATH = process.env.URL_FILE_PATH || "sub.txt"; 
@@ -44,7 +44,7 @@ let singboxMemLimit, cloudflaredMemLimit, dynamicGOGC, dynamicProcs;
 if (totalMemMB <= 160) {
   singboxMemLimit = "38MiB";
   cloudflaredMemLimit = "65MiB";
-  dynamicGOGC = "100";     
+  dynamicGOGC = "80";     
   dynamicProcs = "1";     
 } else if (totalMemMB < 256) {
   singboxMemLimit = "80MiB";
@@ -158,7 +158,7 @@ function generateCertificates(keyPath, certPath) {
 }
 
 const webPath = path.join(FILE_PATH, "web");
-const botPath = path.join(FILE_PATH, "bot");
+const botPath = path.join(FILE_PATH, "cloudflared");
 const configPath = path.join(FILE_PATH, "config.json");
 const certPath = path.join(FILE_PATH, "cert.pem");
 const keyPath = path.join(FILE_PATH, "private.key");
@@ -197,7 +197,11 @@ async function main() {
   fs.writeFileSync(configPath, JSON.stringify({
     log: { level: "panic" },
     inbounds: inbounds,
-    outbounds: [{ type: "direct", tag: "direct", udp_fragment: true }]
+    outbounds: [{ 
+      type: "direct", 
+      tag: "direct", 
+      udp_fragment: true,
+    }]
   }, null, 2));
 
   const isArm = ["arm", "arm64", "aarch64"].includes(os.arch());
@@ -241,19 +245,18 @@ async function main() {
     const rawLinksText = rawLinksArr.join("\r\n");
     if (!rawLinksText) return;
 
-    const base64Sub = Buffer.from(rawLinksText).toString("base64");
+    const topDivider    = "====================== Base64链接 ==========================";
+    const bottomDivider = "==============================================================";
 
-    let fileOutputContent = base64Sub;
+    let fileOutputContent = `${topDivider}\n${base64Sub}`;
     if (isValidSubPort) {
       const publicIP = getPublicIP();
       const httpsSubUrl = `https://${publicIP}:${subPortInt}/${UUID}`;
-      fileOutputContent += `\n\nHTTPS 订阅链接:\n${httpsSubUrl}`;
+      fileOutputContent += `\n\n${bottomDivider}\n\nhttps安全订阅链接:\n${httpsSubUrl}`;
     }
 
     if (!printedOnce) {
-      const topDivider    = "====================== Base64链接 ==========================";
-      const bottomDivider = "==============================================================";
-      log(`\n${topDivider}\n${base64Sub}\n${bottomDivider}`);
+      log(`\n${fileOutputContent}`);
       printedOnce = true;
     }
 
@@ -278,18 +281,14 @@ async function main() {
 
     const server = https.createServer(options, (req, res) => {
       if (req.url === `/${UUID}`) {
-        const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
-        if (rawLinksArr.length > 0) {
-          const base64Only = Buffer.from(rawLinksArr.join("\r\n")).toString("base64");
-          res.writeHead(200, {
-            "Content-Type": "text/plain; charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
-            "Profile-Update-Interval": "24",
-            "Profile-Title": "Base64(Easyshare)"
-          });
-          res.end(base64Only);
-        } else {
-          res.writeHead(404); res.end("Subscription not ready.");
+  const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
+  const rawText = rawLinksArr.join("\r\n").trim();
+  if (rawText) { // ✅ 判断拼接后的实际内容，确保有有效节点
+    const base64Only = Buffer.from(rawText).toString("base64");
+    res.writeHead(200, { /* ... headers ... */ });
+    res.end(base64Only);
+  } else {
+    res.writeHead(404); res.end("Subscription not ready.");
         }
       } else {
         res.writeHead(404); res.end("404 Not Found");
@@ -314,8 +313,11 @@ async function main() {
 
     let argoArgs = ["tunnel", "--no-autoupdate", "--protocol", ARGO_PROTOCOL.toLowerCase(), "--ha-connections", String(ARGO_CONNECTIONS)];
 
+    const cleanCFIP = CFIP.trim().replace(/\s+/g, "");
+
     const setArgoLink = (domain) => {
-      argoNodeLink = `vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&sni=${domain}&fp=chrome&type=ws&host=${domain}&path=${encodeURIComponent(WS_PATH)}#Argo_Easyshare`;
+      const cleanDomain = domain.trim().replace(/\s+/g, "");
+      argoNodeLink = `vless://${UUID}@${cleanCFIP}:${CFPORT}?encryption=none&security=tls&sni=${cleanDomain}&fp=chrome&type=ws&host=${cleanDomain}&path=${encodeURIComponent(WS_PATH)}#Argo_Easyshare`;
     };
 
     if (isFixedTunnel) {
@@ -335,27 +337,47 @@ async function main() {
       stdio: ["ignore", "pipe", "pipe"], detached: true
     });
 
+    const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
-    if (isFixedTunnel) {
-      rl.close();
-    } else {
-      rl.on("line", (chunk) => {
-        const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
-        const domainMatch = cleanLine.match(/https:\/\/([a-zA-Z0-9-]+\.trycloudflare\.com)/);
-        
+    rl.on("line", (chunk) => {
+      const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
+
+      // 1. 捕获临时域名
+      if (!isFixedTunnel && !argoNodeLink) {
+        const domainMatch = cleanLine.match(/https?:\/\/([a-zA-Z0-9-]+\.trycloudflare\.com)/i) ||
+                            cleanLine.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/i);
         if (domainMatch) {
           setArgoLink(domainMatch[1]);
           updateSubFile();
-          
-          rl.close();
         }
-      });
-    }
-    
-    setTimeout(() => {
-      try { rl.close(); } catch (e) {}
-    }, 60000);
+      }
+
+      // 2. 捕获 CDN 边缘节点国别
+      const connMatch = cleanLine.match(/connIndex=(\d+)/i) || cleanLine.match(/"connIndex":(\d+)/i);
+      const locMatch = cleanLine.match(/(?:location|region)["=:\s]+([a-zA-Z0-9]{3,4})/i) ||
+                        cleanLine.match(/Registered tunnel connection.*?\b([A-Z0-9]{3,4})\b/i);
+
+      if (locMatch) {
+        const rawCode = locMatch[1].toUpperCase();
+        const iataCode = rawCode.replace(/[0-9]/g, "");
+        const country = iataMap[iataCode] || iataCode;
+        const connId = connMatch ? connMatch[1] : String(activeConnectionsMap.size);
+
+        if (!activeConnectionsMap.has(connId)) {
+          activeConnectionsMap.set(connId, rawCode);
+          log(`[Cloudflare CDN] 已连接边缘节点：${rawCode}（${country}） | 协议：${ARGO_PROTOCOL.toLowerCase()}`);
+        }
+      }
+
+      
+      const hasCdnOutput = activeConnectionsMap.size > 0;
+      const isReadyToClose = isFixedTunnel ? hasCdnOutput : (hasCdnOutput && Boolean(argoNodeLink));
+
+      if (isReadyToClose) {
+        rl.close(); 
+        }
+    });
 
   } else {
     updateSubFile();
