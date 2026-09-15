@@ -244,6 +244,7 @@ async function main() {
     const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
     const rawLinksText = rawLinksArr.join("\r\n");
     if (!rawLinksText) return;
+    const base64Sub = Buffer.from(rawLinksText).toString("base64");
 
     const topDivider    = "====================== Base64链接 ==========================";
     const bottomDivider = "==============================================================";
