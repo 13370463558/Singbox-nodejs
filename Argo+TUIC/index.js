@@ -4,26 +4,26 @@
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC端口（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                                 // TUIC端口（留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                            // Argo回源端口填入8001（留空=不部署）
+const ARGO_PORT = process.env.ARGO_PORT || "8001";                             // Argo回源端口填入8001（留空=不部署）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                     // http2或quic（http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2小于8，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                  // 隧道连接数量 建议http2小于8，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            // 固定隧道域名
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                             // 固定隧道域名
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                                // 固定隧道Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "";                                 // 固定隧道Token
 
-const CFIP = process.env.CFIP || "www.wto.org";                               // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
+const CFIP = process.env.CFIP || "www.wto.org";                                // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
 
 
 // ============================ 变量设置完成 ===============================
 
 
 const CFPORT = process.env.CFPORT || "443";                                
-const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
+const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "";
 const FILE_PATH = process.env.FILE_PATH || ".tmp";
 const URL_FILE_PATH = process.env.URL_FILE_PATH || "sub.txt"; 
 const http = require("http");
@@ -260,15 +260,17 @@ async function main() {
       const publicIP = getPublicIP();
       const httpsSubUrl = `https://${publicIP}:${subPortInt}/${UUID}`;
       fileOutputContent += `\n\nhttps安全订阅链接:\n${httpsSubUrl}`;
+    } else {
+      fileOutputContent += `\n\n端口匹配失败，未能开启https订阅`;
     }
 
     if (!printedOnce) {
-      log(`\n${consoleOutputContent}`); // ✅ 控制台仅输出 Base64 内容
+      log(`\n${consoleOutputContent}`); 
       printedOnce = true;
     }
 
     try {
-      fs.writeFileSync(URL_FILE_PATH, fileOutputContent, "utf-8"); // 📄 sub.txt 依然包含 HTTPS 安全订阅链接
+      fs.writeFileSync(URL_FILE_PATH, fileOutputContent, "utf-8"); 
       log(`[链接] Base64/https安全订阅 已写入: ${URL_FILE_PATH}`);
     } catch (e) {
       log(`[存储] 写入文件失败: ${e.message}`);
@@ -290,7 +292,7 @@ async function main() {
       if (req.url === `/${UUID}`) {
   const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
   const rawText = rawLinksArr.join("\r\n").trim();
-  if (rawText) { // ✅ 判断拼接后的实际内容，确保有有效节点
+  if (rawText) { 
     const base64Only = Buffer.from(rawText).toString("base64");
     res.writeHead(200, { /* ... headers ... */ });
     res.end(base64Only);
@@ -307,6 +309,8 @@ async function main() {
     }).on("error", (err) => {
       log(`[订阅服务] 启动失败: ${err.message}`);
     });
+  } else {
+    log(`[订阅服务] 端口匹配失败，未能开启https订阅`);
   }
 
   let botProc = null;
@@ -350,7 +354,6 @@ async function main() {
     rl.on("line", (chunk) => {
       const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
 
-      // 1. 捕获临时域名
       if (!isFixedTunnel && !argoNodeLink) {
         const domainMatch = cleanLine.match(/https?:\/\/([a-zA-Z0-9-]+\.trycloudflare\.com)/i) ||
                             cleanLine.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/i);
@@ -360,7 +363,6 @@ async function main() {
         }
       }
 
-      // 2. 捕获 CDN 边缘节点国别
       const connMatch = cleanLine.match(/connIndex=(\d+)/i) || cleanLine.match(/"connIndex":(\d+)/i);
       const locMatch = cleanLine.match(/(?:location|region)["=:\s]+([a-zA-Z0-9]{3,4})/i) ||
                         cleanLine.match(/Registered tunnel connection.*?\b([A-Z0-9]{3,4})\b/i);
@@ -382,7 +384,11 @@ async function main() {
       const isReadyToClose = isFixedTunnel ? hasCdnOutput : (hasCdnOutput && Boolean(argoNodeLink));
 
       if (isReadyToClose) {
-        rl.close(); 
+      if (global.argoCloseTimer) clearTimeout(global.argoCloseTimer);
+
+        global.argoCloseTimer = setTimeout(() => {
+          rl.close();
+        }, 6000);
         }
     });
 
