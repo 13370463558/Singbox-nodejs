@@ -4,22 +4,23 @@
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                                  // TUIC端口（留空=不部署TUIC）
+const TUIC_PORT = process.env.TUIC_PORT || "";                                // TUIC端口（留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                              // Argo回源端口填入8001（留空=不部署Argo）
+const ARGO_PORT = process.env.ARGO_PORT || "8001";                            // Argo回源端口填入8001（留空=不部署）
 
-const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                      // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
+const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                    // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                   // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                 // 隧道连接数量 建议http2小于8，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                              // 固定隧道域名
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                            // 固定隧道域名
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                                  // 固定隧道Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "";                                // 固定隧道Token
 
-const CFIP = process.env.CFIP || "www.wto.org";                                 // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
+const CFIP = process.env.CFIP || "www.wto.org";                               // 优选域名（ www.visa.com.hk  usa.visa.com  www.shopify.com) 
 
 
 // ============================ 变量设置完成 ===============================
+
 
 const CFPORT = process.env.CFPORT || "443";                                
 const SUB_PORT = process.env.SUB_PORT || process.env.SERVER_PORT || process.env.PORT || "3000";
@@ -47,7 +48,7 @@ let singboxMemLimit, cloudflaredMemLimit, dynamicGOGC, dynamicProcs;
 if (totalMemMB <= 160) {
   singboxMemLimit = "35MiB";
   cloudflaredMemLimit = "60MiB";
-  dynamicGOGC = "70";     
+  dynamicGOGC = "100";     
   dynamicProcs = "1";     
 } else if (totalMemMB < 256) {
   singboxMemLimit = "80MiB";
