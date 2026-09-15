@@ -13,13 +13,20 @@ mkdir -p .tmp
 
 echo "[INFO] 启动 Argo + TUIC 主程序 (index.js)..."
 
+NODE_CMD="node --expose-gc --max-old-space-size=40 index.js"
+
 while true; do
-    node index.js
+    $NODE_CMD
     
     EXIT_CODE=$?
     
     if [ $EXIT_CODE -eq 0 ]; then
         echo "[INFO] 主程序已正常退出。"
+        break
+    fi
+    
+    if [ $EXIT_CODE -eq 130 ] || [ $EXIT_CODE -eq 143 ]; then
+        echo "[INFO] 收到系统终止信号，停止保活。"
         break
     fi
     
