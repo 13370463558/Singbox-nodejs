@@ -2,7 +2,7 @@
 
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "6707";                               // TUIC 端口（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "";                               // TUIC 端口（留空=不部署）
 
 const ARGO_PORT = process.env.ARGO_PORT || "8001";                           // Argo回源端口填入8001 （留空=不部署）
 
@@ -10,9 +10,9 @@ const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                   // 
 
 const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "c";                           // 固定隧道域名
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "fc";                           // 固定隧道域名
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "RkN2UxIiwicyI6Ik5tRXpOelpsWXpBdE5tVTVZUzAwTm1aaExXRXdabU10WW1NNE5UZzROakZtT0dGbSJ9";                               // 固定隧道 Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "eWXpBdE5tVTVZUzAwTm1aaExXRXdabU10WW1NNE5UZzROakZtT0dGbSJ9";                               // 固定隧道 Token
 
 const CFIP = process.env.CFIP || "www.visa.com.hk";                          // 优选域名/IP（ www.wto.org  usa.visa.com  www.shopify.com) 
 
@@ -44,8 +44,7 @@ const GO_BASE_ENV = {
   ...process.env,
   GODEBUG: "madvdontneed=1,cgocheck=0,netdns=go",
   GOMAXPROCS: "1",
-  GOGC: "20", // 降低 GC 触发阈值，更快回收 Go 堆空间
-  NODE_OPTIONS: "--max-old-space-size=16 --optimize-for-size"
+  GOGC: "10", 
 };
 const SINGBOX_MEM_LIMIT = "16MiB";
 const CLOUDFLARED_MEM_LIMIT = "20MiB";
@@ -174,7 +173,14 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
       await downloadFile(cloudflaredUrl, botPath);
     }
     fs.chmodSync(botPath, 0o775);
-
+setTimeout(() => {
+      if (fs.existsSync(botPath)) {
+        try { 
+          fs.unlinkSync(botPath); 
+          log("[存储优化] cloudflared 保活中，bot 文件已清理"); 
+        } catch (e) {}
+      }
+    }, 15000);
 
     if (!isFixedTunnel) {
       log("未检测到 Token，启动临时隧道...");
@@ -182,16 +188,26 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
       log("检测到 Token，启动固定隧道...");
     }
 
-    const stdioConfig = isFixedTunnel ? "ignore" : ["ignore", "pipe", "pipe"];
+    const stdioConfig = ["ignore", "pipe", "pipe"];
 
     botProc = spawn(botPath, argoArgs, {
       env: Object.assign({}, GO_BASE_ENV, { GOMEMLIMIT: CLOUDFLARED_MEM_LIMIT }),
       stdio: stdioConfig, detached: true
     });
 
-    const activeConnectionsMap = new Map();
-    const rl = readline.createInterface({ input: botProc.stderr });
-
+    if (botProc.stderr) {
+      const activeConnectionsMap = new Map();
+      const rl = readline.createInterface({ input: botProc.stderr });
+const destroyStream = () => {
+        try {
+          rl.removeListener("line", onLineHandler);
+          rl.close();
+          if (botProc && botProc.stderr) {
+            botProc.stderr.destroy();
+            botProc.stderr.unref();
+          }
+        } catch (e) {}
+      };
     // ⚡ 抽出单独的处理逻辑，以便在拿到域名后第一时间彻底销毁监听器，切断晚高峰日志流
     const onLineHandler = (chunk) => {
       const cleanLine = chunk.replace(/\u001b\[[0-9;]*m/g, "");
@@ -203,7 +219,8 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
           updateSubFile(true);
           // ⚡【核心优化】拿到临时域名后，立刻关闭 readline，不再解析后续海量日志！
           rl.close();
-          try { botProc.stderr.destroy(); } catch (e) {}
+          destroyStream();
+          return;
         }
       }
 
@@ -227,12 +244,8 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
     rl.on("line", onLineHandler);
 
     // 仅保留一次 60 秒自动销毁，彻底清理晚高峰日志流，防止 CPU/内存消耗
-    setTimeout(() => {
-      try {
-        rl.close();
-        if (botProc && botProc.stderr) botProc.stderr.unref();
-      } catch (e) {}
-    }, 60000);
+    setTimeout(destroyStream, 60000);
+     }
 
     botProc.on("exit", (code, signal) => {
       if (isExiting) return;
@@ -268,13 +281,12 @@ async function main() {
     inbounds.push({
       type: "vless", tag: "vless-in", listen: "127.0.0.1", listen_port: parseInt(ARGO_PORT),
       users: [{ uuid: UUID }], transport: { type: "ws", path: WS_PATH },
-      sniff: false
     });
   }
   if (enableTuic) {
     generateCertificates(keyPath, certPath);
     inbounds.push({
-      type: "tuic", tag: "tuic-in", listen: "::", listen_port: parseInt(TUIC_PORT),
+      type: "tuic", tag: "tuic-in", listen: "0.0.0.0", listen_port: parseInt(TUIC_PORT),
       users: [{ uuid: UUID, password: TUIC_PASSWORD }], congestion_control: "bbr",
       tls: { enabled: true, alpn: ["h3"], certificate_path: certPath, key_path: keyPath }
     });
@@ -318,6 +330,9 @@ async function main() {
       fs.writeFileSync(URL_FILE_PATH, subFileFormatted, "utf-8"); 
       log(`[链接] Base64/https安全订阅 已写入: ${URL_FILE_PATH}`);
     } catch (e) {}
+    if (global.gc) {
+            setTimeout(() => { try { global.gc(); } catch (e) {} }, 100);
+        }
   };
 
   if (enableTuic) {
@@ -364,7 +379,7 @@ async function main() {
           });
           res.end(globalSubContentCache);
           if (global.gc) {
-            try { global.gc(); } catch (e) {}
+            setTimeout(() => { try { global.gc(); } catch (e) {} }, 100);
           }
         } else {
           res.writeHead(404, { "Connection": "close" }); res.end("Not Ready");
