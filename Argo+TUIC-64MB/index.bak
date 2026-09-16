@@ -174,9 +174,9 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
     fs.chmodSync(botPath, 0o775);
 
     if (!isFixedTunnel) {
-      log("未检测到 Token，启动临时隧道...");
+      log("[Argo] 缺少有效域名或 Token，启动临时隧道...");
     } else {
-      log("检测到 Token，启动固定隧道...");
+      log("[Argo] 检测到域名与 Token，启动固定隧道...");
     }
 
     botProc = spawn(botPath, argoArgs, {
@@ -206,8 +206,7 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
         if (domainMatch) {
           setArgoLink(domainMatch[1]);
           updateSubFile(true);
-          // 拿到临时域名后彻底释放监听器
-          detachStream();
+          
         }
       }
 
@@ -286,8 +285,9 @@ async function main() {
 
   let argoNodeLink = "";
   let tuicNodeLink = "";
+  const domainTrim = ARGO_DOMAIN.trim();
   const authTrim = ARGO_AUTH.trim();
-  const isFixedTunnel = authTrim.length > 30;
+  const isFixedTunnel = domainTrim.length > 0 && authTrim.length > 30;
 
   let hasPrintedConsole = false;
   const updateSubFile = (forceConsole = false) => {
@@ -321,7 +321,7 @@ async function main() {
 
     if (isFixedTunnel) {
       argoArgs.push("run", "--token", authTrim);
-      if (ARGO_DOMAIN.trim()) setArgoLink(ARGO_DOMAIN.trim());
+      setArgoLink(domainTrim);
     } else {
       argoArgs.push("--url", `http://127.0.0.1:${ARGO_PORT}`);
     }
