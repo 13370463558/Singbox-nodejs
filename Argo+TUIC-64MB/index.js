@@ -221,14 +221,6 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
       }
     };
 
-    rl.on("line", onLineHandler);
-
-    setTimeout(() => {
-      try {
-        rl.close();
-        if (botProc && botProc.stderr) botProc.stderr.unref();
-      } catch (e) {}
-    }, 60000);
 
     rl.on("line", onLineHandler);
 
