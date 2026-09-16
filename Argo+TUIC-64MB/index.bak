@@ -2,7 +2,7 @@
 
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                               // TUIC 端口（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "6707";                               // TUIC 端口（留空=不部署）
 
 const ARGO_PORT = process.env.ARGO_PORT || "8001";                           // Argo回源端口填入8001 （留空=不部署）
 
@@ -10,9 +10,9 @@ const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                   // 
 
 const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "fc";                           // 固定隧道域名
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "c";                           // 固定隧道域名
 
-const ARGO_AUTH = process.env.ARGO_AUTH || "tNW1NNE5UZzROakZtT0dGbSJ9";                               // 固定隧道 Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "RkN2UxIiwicyI6Ik5tRXpOelpsWXpBdE5tVTVZUzAwTm1aaExXRXdabU10WW1NNE5UZzROakZtT0dGbSJ9";                               // 固定隧道 Token
 
 const CFIP = process.env.CFIP || "www.visa.com.hk";                          // 优选域名/IP（ www.wto.org  usa.visa.com  www.shopify.com) 
 
@@ -44,8 +44,8 @@ const GO_BASE_ENV = {
   ...process.env,
   GODEBUG: "madvdontneed=1,cgocheck=0,netdns=go",
   GOMAXPROCS: "1",
-  GOGC: "30",                                  // 提升至 30，降低 GC 频次以保障 4K 视频流畅度
-  NODE_OPTIONS: "--max-old-space-size=24"
+  GOGC: "20", // 降低 GC 触发阈值，更快回收 Go 堆空间
+  NODE_OPTIONS: "--max-old-space-size=16 --optimize-for-size"
 };
 const SINGBOX_MEM_LIMIT = "16MiB";
 const CLOUDFLARED_MEM_LIMIT = "20MiB";
@@ -182,9 +182,11 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
       log("检测到 Token，启动固定隧道...");
     }
 
+    const stdioConfig = isFixedTunnel ? "ignore" : ["ignore", "pipe", "pipe"];
+
     botProc = spawn(botPath, argoArgs, {
       env: Object.assign({}, GO_BASE_ENV, { GOMEMLIMIT: CLOUDFLARED_MEM_LIMIT }),
-      stdio: ["ignore", "pipe", "pipe"], detached: true
+      stdio: stdioConfig, detached: true
     });
 
     const activeConnectionsMap = new Map();
@@ -201,7 +203,7 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
           updateSubFile(true);
           // ⚡【核心优化】拿到临时域名后，立刻关闭 readline，不再解析后续海量日志！
           rl.close();
-          try { botProc.stderr.unref(); } catch (e) {}
+          try { botProc.stderr.destroy(); } catch (e) {}
         }
       }
 
@@ -291,12 +293,14 @@ async function main() {
   const authTrim = ARGO_AUTH.trim();
   const isFixedTunnel = authTrim.length > 30;
 
+  let globalSubContentCache = "";
   let hasPrintedConsole = false;
   const updateSubFile = (forceConsole = false) => {
     const rawLinksText = [argoNodeLink, tuicNodeLink].filter(Boolean).join("\r\n");
     if (!rawLinksText) return;
     
-    const base64Sub = Buffer.from(rawLinksText).toString("base64");
+    globalSubContentCache = Buffer.from(rawLinksText).toString("base64");
+    const base64Sub = globalSubContentCache;
     const consoleFormatted = `====================== Base64链接 ==========================\n${base64Sub}\n==============================================================`;
 
     let subFileFormatted = consoleFormatted;
@@ -352,21 +356,21 @@ async function main() {
 
     https.createServer(httpsOptions, (req, res) => {
       if (req.url.split("?")[0] === `/${UUID}`) {
-        const rawLinksArr = [argoNodeLink, tuicNodeLink].filter(Boolean);
-        if (rawLinksArr.length > 0) {
-          res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
-
-          const subContent = Buffer.from(rawLinksArr.join("\r\n")).toString("base64");
-          res.end(subContent);
-     
+        if (globalSubContentCache) {
+          res.writeHead(200, { 
+            "Content-Type": "text/plain; charset=utf-8", 
+            "Access-Control-Allow-Origin": "*",
+            "Connection": "close"
+          });
+          res.end(globalSubContentCache);
           if (global.gc) {
             try { global.gc(); } catch (e) {}
           }
         } else {
-          res.writeHead(404); res.end("Not Ready");
+          res.writeHead(404, { "Connection": "close" }); res.end("Not Ready");
         }
       } else {
-        res.writeHead(404); res.end("404");
+        res.writeHead(404, { "Connection": "close" }); res.end("404");
       }
     }).listen(subPortInt, () => log("[订阅服务] https安全订阅已启用"));
   } 
