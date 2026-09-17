@@ -10,14 +10,14 @@
 
 ### 1. 临时隧道+TUIC部署流程
 
-1. 将 `start.sh`、`index.js` 和 `package.json` 上传至面板服务器根目录（无需修改文件内容）。
+1. 将 `start.sh`、`index.js` 和 `package.json` 上传至面板服务器根目录。
 2. 填入TUIC端口号。
-3. 
+3. 临时隧道协议切换http2/quic，连接数默认1
 4. 开机。
 
 > [!NOTE]
 > **临时隧道说明**  
-> Cloudflare临时隧道默认优先单连接模式。
+> Cloudflare临时隧道默认优先单连接模式：连接数=1.
 
 ---
 
