@@ -7,19 +7,18 @@
 
 ---
 
-## 1. 💡 http2/quic双模Argo + TUIC方案说明：
+## 1. 💡 双模Argo + TUIC方案说明：
 
-
-* **精简 Sing-box 架构**：启用DNS优化，内存自适应+极限精简优化，64MB极低内存也能稳定运行。
   
-* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、连接数量可调。
+* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、隧道连接数。
 
-* **启用https安全订阅**：避免http明文订阅潜在的泄露问题。
+* **极限精简与优化**：自适应+内存回收机制+DNS优化。
+
   
 * **📌 适用场景**：
   
   * 双模Argo：直连线路质量差、UDP 被 QoS 限速或阻断，服务器未开放公网端口。
-  * TUIC：本地TCP拥塞严重、晚高峰时段。
+  * TUIC：本地TCP拥塞严重、晚高峰拥塞时段。
 
 ### “Argo+TUIC-64MB”适用：64MB低内存环境，如Freecloudpanel。
 
