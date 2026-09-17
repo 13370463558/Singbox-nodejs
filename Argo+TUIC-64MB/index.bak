@@ -2,12 +2,12 @@
 
 // =================== Argo + TUIC 变量设置区域 开始 =======================
 
-const TUIC_PORT = process.env.TUIC_PORT || "";                               // TUIC 端口（留空=不部署）
+const TUIC_PORT = process.env.TUIC_PORT || "6707";                               // TUIC 端口（留空=不部署）
 const ARGO_PORT = process.env.ARGO_PORT || "8001";                           // Argo回源端口填入8001 （留空=不部署）
 const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                   // http2或quic （http2=稳定+低占用；quic=响应快+占用略高）
 const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                // 隧道连接数量 建议http2=4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                           // 固定隧道域名
-const ARGO_AUTH = process.env.ARGO_AUTH || "";                               // 固定隧道 Token
+const ARGO_AUTH = process.env.ARGO_AUTH || "eyJhIjoiNTZjZGYzNDgxZDMzMWNjMzdiYmFlNDQ4NTM2MmYxMGEiLCJ0IjoiNmVmN2QxZjYtNDgzOC00YzA0LWI4NDktNmRmZTA5ZWRkN2UxIiwicyI6Ik5tRXpOelpsWXpBdE5tVTVZUzAwTm1aaExXRXdabU10WW1NNE5UZzROakZtT0dGbSJ9";                               // 固定隧道 Token
 const CFIP = process.env.CFIP || "www.visa.com.hk";                          // 优选域名/IP（ www.wto.org  usa.visa.com  www.shopify.com) 
 
 // ============================ 变量设置完成 ===============================
@@ -37,7 +37,6 @@ const iataMap = {
 const GO_BASE_ENV = {
   ...process.env,
   GODEBUG: "madvdontneed=1,cgocheck=0,netdns=go",
-  GOMAXPROCS: "2",
   GOGC: "12"
 };
 const SINGBOX_MEM_LIMIT = "18MiB";
@@ -277,8 +276,44 @@ async function main() {
   // 完全保留你的原版配置结构
   fs.writeFileSync(configPath, JSON.stringify({
     log: { level: "panic" },
+    dns: {
+      servers: [
+        {
+          tag: "google-dns",
+  address: "8.8.8.8",
+  strategy: "prefer_ipv4",
+  detour: "direct"
+},
+{
+  tag: "cf-dns",
+  address: "1.1.1.1",
+  strategy: "prefer_ipv4",
+  detour: "direct"
+        }
+      ],
+      rules: [
+        {
+          domain_suffix: [
+            "google.com",
+            "youtube.com",
+            "googlevideo.com",
+            "ytimg.com",
+            "ggpht.com"
+          ],
+          server: "google-dns"
+        }
+      ],
+      final: "cf-dns",
+      strategy: "prefer_ipv4",
+      independent_cache: true,
+      reverse_mapping: false
+    },
     inbounds: inbounds,
-    outbounds: [{ type: "direct", tag: "direct", udp_fragment: true }]
+    outbounds: [{ type: "direct", tag: "direct", udp_fragment: true }],
+    route: {
+      auto_detect_interface: true,
+      final: "direct"
+    }
   }));
 
   await startSingbox();
