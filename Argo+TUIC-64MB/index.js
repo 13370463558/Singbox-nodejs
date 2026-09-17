@@ -45,6 +45,7 @@ const iataMap = {
 const GO_BASE_ENV = {
   ...process.env,
   GODEBUG: "madvdontneed=1,cgocheck=0,netdns=go",
+  GOMAXPROCS: "1",
   GOGC: "12"
 };
 const SINGBOX_MEM_LIMIT = "18MiB";
