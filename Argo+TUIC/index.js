@@ -359,7 +359,7 @@ async function main() {
     if (!rawLinksText) return;
     
     const base64Sub = Buffer.from(rawLinksText).toString("base64");
-    const consoleFormatted = `====================== Base64链接 ==========================\n${base64Sub}\n==============================================================`;
+    const consoleFormatted = `====================== Base64 链接 ==========================\n${base64Sub}\n==============================================================`;
 
     if (!hasPrintedConsole || forceConsole) {
       log(`\n${consoleFormatted}`);
@@ -368,7 +368,7 @@ async function main() {
 
     try { 
       fs.writeFileSync(URL_FILE_PATH, consoleFormatted, "utf-8"); 
-      log(`[链接] Base64已写入: ${URL_FILE_PATH}`);
+      log(`[链接] Base64 已写入: ${URL_FILE_PATH}`);
     } catch (e) {}
   };
 
