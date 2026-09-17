@@ -340,7 +340,7 @@ async function main() {
 
     try { 
       fs.writeFileSync(URL_FILE_PATH, consoleFormatted, "utf-8"); 
-      log(`[链接] Base64订阅节点已写入: ${URL_FILE_PATH}`);
+      log(`[链接] Base64节点已写入: ${URL_FILE_PATH}`);
     } catch (e) {}
   };
 
