@@ -90,7 +90,6 @@ function downloadFile(urlStr, targetPath) {
   });
 }
 
-// 优化：将原版同步 execSync("curl ...") 改为纯异步非阻塞请求，防止系统卡死
 function getPublicIP() {
   return new Promise((resolve) => {
     const req = https.get("https://api.ipify.org", { timeout: 2000 }, (res) => {
@@ -140,14 +139,12 @@ async function startSingbox() {
     }
     fs.chmodSync(webPath, 0o775);
 
-    // 完全保留你的原版 stdio 结构，确保 sing-box 正常启动
     webProc = spawn(webPath, ["run", "-c", configPath], {
       env: Object.assign({}, GO_BASE_ENV, { GOMEMLIMIT: SINGBOX_MEM_LIMIT }),
       stdio: ["ignore", "ignore", "pipe"],
       detached: true
     });
 
-    // 完全保留你的原版 15秒 清理 web 文件逻辑
     setTimeout(() => {
       if (fs.existsSync(webPath)) {
         try { 
@@ -155,7 +152,7 @@ async function startSingbox() {
           log("[存储优化]sing-box 保活中，web文件已清理"); 
         } catch (e) {}
       }
-    }, 15000);
+    }, 4000);
 
     webProc.on("exit", (code, signal) => {
       if (isExiting) return;
@@ -194,7 +191,6 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
     const activeConnectionsMap = new Map();
     const rl = readline.createInterface({ input: botProc.stderr });
 
-    // 彻底切断日志流，防止 Stream Memory Leak
     const detachStream = () => {
       try {
         rl.close();
@@ -217,7 +213,6 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
         }
       }
 
-      // 完全保留你的原版 CDN 节点国别与连接数解析逻辑
       const connMatch = cleanLine.match(/connIndex=(\d+)/i) || cleanLine.match(/"connIndex":(\d+)/i);
       const locMatch = cleanLine.match(/(?:location|region)["=:\s]+([a-zA-Z0-9]{3,4})/i) ||
                         cleanLine.match(/Registered tunnel connection.*?\b([A-Z0-9]{3,4})\b/i);
@@ -237,7 +232,6 @@ async function startCloudflared(argoArgs, isFixedTunnel, setArgoLink, updateSubF
 
     rl.on("line", onLineHandler);
 
-    // 60秒超时保护，切断日志流
     setTimeout(detachStream, 60000);
 
     botProc.on("exit", (code, signal) => {
@@ -281,7 +275,6 @@ async function main() {
     });
   }
 
-  // 完全保留你的原版配置结构
   fs.writeFileSync(configPath, JSON.stringify({
     log: { level: "panic" },
     dns: {
