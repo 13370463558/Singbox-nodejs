@@ -5,11 +5,11 @@
 
 const TUIC_PORT = process.env.TUIC_PORT || "";                                 // TUIC 端口（留空=不部署）
 
-const ARGO_PORT = process.env.ARGO_PORT || "8001";                             // Argo回源端口填入8001 （留空=不部署：临时/固定隧道）
+const ARGO_PORT = process.env.ARGO_PORT || "8001";                             // Argo回源端口填入8001 （留空=不部署）
 
 const ARGO_PROTOCOL = process.env.ARGO_PROTOCOL || "quic";                     // http2或quic（http2=稳定+低占用；quic=响应快+占用略高）
 
-const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                  // 隧道连接数量 建议http2<4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
+const ARGO_CONNECTIONS = process.env.ARGO_CONNECTIONS || "1";                  // 隧道连接数量 建议http2≤4，quic=1 （多条UDP会增加占用，也可能会触发机房QoS）
 
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";                             // 固定隧道域名
 
@@ -46,10 +46,10 @@ const GO_BASE_ENV = {
   ...process.env,
   GODEBUG: "madvdontneed=1,cgocheck=0,netdns=go",
   GOMAXPROCS: "1",
-  GOGC: "12"
+  GOGC: "11"
 };
-const SINGBOX_MEM_LIMIT = "18MiB";
-const CLOUDFLARED_MEM_LIMIT = "20MiB";
+const SINGBOX_MEM_LIMIT = "15MiB";
+const CLOUDFLARED_MEM_LIMIT = "18MiB";
 
 if (!fs.existsSync(FILE_PATH)) fs.mkdirSync(FILE_PATH, { recursive: true });
 
@@ -279,36 +279,15 @@ async function main() {
   fs.writeFileSync(configPath, JSON.stringify({
     log: { level: "panic" },
     dns: {
-      servers: [
-        {
-          tag: "google-dns",
-  address: "8.8.8.8",
+  servers: [
+    {
+      tag: "local-sys-dns",
+      address: "local", 
+      detour: "direct"
+    }
+  ],
   strategy: "prefer_ipv4",
-  detour: "direct"
-},
-{
-  tag: "cf-dns",
-  address: "1.1.1.1",
-  strategy: "prefer_ipv4",
-  detour: "direct"
-        }
-      ],
-      rules: [
-        {
-          domain_suffix: [
-            "google.com",
-            "youtube.com",
-            "googlevideo.com",
-            "ytimg.com",
-            "ggpht.com"
-          ],
-          server: "google-dns"
-        }
-      ],
-      final: "cf-dns",
-      strategy: "prefer_ipv4",
-      independent_cache: true,
-      reverse_mapping: false
+  independent_cache: true
     },
     inbounds: inbounds,
     outbounds: [{ type: "direct", tag: "direct", udp_fragment: true }],
