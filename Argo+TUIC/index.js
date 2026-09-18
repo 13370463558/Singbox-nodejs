@@ -308,34 +308,13 @@ async function main() {
     dns: {
       servers: [
         {
-          tag: "google-dns",
-          address: "8.8.8.8",
-          strategy: "prefer_ipv4",
-          detour: "direct"
-        },
-        {
-          tag: "cf-dns",
-          address: "1.1.1.1",
-          strategy: "prefer_ipv4",
+          tag: "local-sys-dns",
+          address: "local",
           detour: "direct"
         }
       ],
-      rules: [
-        {
-          domain_suffix: [
-            "google.com",
-            "youtube.com",
-            "googlevideo.com",
-            "ytimg.com",
-            "ggpht.com"
-          ],
-          server: "google-dns"
-        }
-      ],
-      final: "cf-dns",
       strategy: "prefer_ipv4",
-      independent_cache: true,
-      reverse_mapping: false
+      independent_cache: true
     },
     inbounds: inbounds,
     outbounds: [{ type: "direct", tag: "direct", udp_fragment: true }],
