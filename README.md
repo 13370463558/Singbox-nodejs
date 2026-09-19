@@ -1,7 +1,7 @@
 ## 1. 💡 双模Argo + TUIC方案：IP被墙、抗封锁、晚高峰UDP直连 黄金组合：
 
   
-* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、隧道连接数。
+* **TCP/UDP双模 Argo隧道**：手动切换http2/quic、隧道连接数，Cloudflare CDN节点可见。
 
 * **极限精简与优化**：6级自适应匹配 + 主动内存回收机制。
 
