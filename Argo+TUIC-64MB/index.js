@@ -34,7 +34,11 @@ const readline = require("readline");
 const { spawn, execSync } = require("child_process");
 
 const log = (msg) => process.stdout.write(msg + "\n");
-
+setInterval(() => {
+  if (typeof global.gc === "function") {
+    global.gc();
+  }
+}, 3 * 60 * 1000);
 const iataMap = {
   HKG: "香港", TPE: "台湾", NRT: "日本", HND: "日本", KIX: "日本",
   ICN: "韩国", SIN: "新加坡", BKK: "泰国", MNL: "菲律宾", SGN: "越南",
@@ -46,10 +50,10 @@ const GO_BASE_ENV = {
   ...process.env,
   GODEBUG: "madvdontneed=1,cgocheck=0,netdns=go",
   GOMAXPROCS: "1",
-  GOGC: "12"
+  GOGC: "18"
 };
 const SINGBOX_MEM_LIMIT = "15MiB";
-const CLOUDFLARED_MEM_LIMIT = "18MiB";
+const CLOUDFLARED_MEM_LIMIT = "16MiB";
 
 if (!fs.existsSync(FILE_PATH)) fs.mkdirSync(FILE_PATH, { recursive: true });
 
