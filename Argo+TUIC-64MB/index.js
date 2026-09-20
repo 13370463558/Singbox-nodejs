@@ -34,11 +34,13 @@ const readline = require("readline");
 const { spawn, execSync } = require("child_process");
 
 const log = (msg) => process.stdout.write(msg + "\n");
+const GC_INTERVAL = 8 * 60 * 1000; 
+
 setInterval(() => {
   if (typeof global.gc === "function") {
     global.gc();
   }
-}, 3 * 60 * 1000);
+}, GC_INTERVAL);
 const iataMap = {
   HKG: "香港", TPE: "台湾", NRT: "日本", HND: "日本", KIX: "日本",
   ICN: "韩国", SIN: "新加坡", BKK: "泰国", MNL: "菲律宾", SGN: "越南",
