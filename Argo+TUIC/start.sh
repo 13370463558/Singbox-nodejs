@@ -11,9 +11,32 @@ fi
 
 mkdir -p .tmp
 
+export MALLOC_ARENA_MAX=2
+
+TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
+
+if [ -z "$TOTAL_RAM_MB" ] || [ "$TOTAL_RAM_MB" -eq 0 ]; then
+    TOTAL_RAM_MB=128
+fi
+
+if [ "$TOTAL_RAM_MB" -lt 160 ]; then
+    NODE_MEM=40
+elif [ "$TOTAL_RAM_MB" -lt 256 ]; then
+    NODE_MEM=64
+elif [ "$TOTAL_RAM_MB" -lt 320 ]; then
+    NODE_MEM=96
+elif [ "$TOTAL_RAM_MB" -lt 448 ]; then
+    NODE_MEM=128
+elif [ "$TOTAL_RAM_MB" -lt 576 ]; then
+    NODE_MEM=160
+else
+    NODE_MEM=256
+fi
+
+echo "[INFO] 检测到系统内存: ${TOTAL_RAM_MB}MB | Node.js 堆上限设为: ${NODE_MEM}MB"
 echo "[INFO] 启动 Argo + TUIC 主程序 (index.js)..."
 
-NODE_CMD="node --expose-gc --max-old-space-size=40 index.js"
+NODE_CMD="node --expose-gc --max-old-space-size=${NODE_MEM} index.js"
 
 while true; do
     $NODE_CMD
