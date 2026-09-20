@@ -34,7 +34,24 @@ const readline = require("readline");
 const { spawn, execSync } = require("child_process");
 
 const log = (msg) => process.stdout.write(msg + "\n");
+const TOTAL_MEM_MB = Math.floor(os.totalmem() / 1024 / 1024);
 
+function getGcInterval(totalMB) {
+  if (totalMB < 160) return 3 * 60 * 1000;   
+  if (totalMB < 256) return 5 * 60 * 1000;   
+  if (totalMB < 320) return 7 * 60 * 1000;  
+  if (totalMB < 448) return 10 * 60 * 1000;  
+  if (totalMB < 576) return 12 * 60 * 1000;  
+  return 15 * 60 * 1000;                     
+}
+
+const gcIntervalMs = getGcInterval(TOTAL_MEM_MB);
+
+setInterval(() => {
+  if (typeof global.gc === "function") {
+    global.gc();
+  }
+}, gcIntervalMs);
 const iataMap = {
   HKG: "香港", TPE: "台湾", NRT: "日本", HND: "日本", KIX: "日本",
   ICN: "韩国", SIN: "新加坡", BKK: "泰国", MNL: "菲律宾", SGN: "越南",
@@ -46,9 +63,9 @@ const totalMemMB = Math.round(os.totalmem() / 1024 / 1024);
 let singboxMemLimit, cloudflaredMemLimit, dynamicGOGC, dynamicProcs;
 
 if (totalMemMB <= 160) {
-  singboxMemLimit = "35MiB";
-  cloudflaredMemLimit = "60MiB";
-  dynamicGOGC = "75";
+  singboxMemLimit = "30MiB";
+  cloudflaredMemLimit = "50MiB";
+  dynamicGOGC = "100";
   dynamicProcs = "1";
 } else if (totalMemMB < 256) {
   singboxMemLimit = "80MiB";
