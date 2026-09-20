@@ -12,28 +12,43 @@ fi
 mkdir -p .tmp
 
 export MALLOC_ARENA_MAX=2
+export UV_THREADPOOL_SIZE=2
+export NODE_NO_WARNINGS=1
 
-TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
+MEM_BYTES=0
+if [ -f "/sys/fs/cgroup/memory.max" ]; then
+    # cgroup v2
+    MEM_BYTES=$(cat /sys/fs/cgroup/memory.max 2>/dev/null)
+elif [ -f "/sys/fs/cgroup/memory/memory.limit_in_bytes" ]; then
+    # cgroup v1
+    MEM_BYTES=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null)
+fi
+
+if [ -z "$MEM_BYTES" ] || [ "$MEM_BYTES" = "max" ] || [ "$MEM_BYTES" -gt 9223372036854771712 ] 2>/dev/null; then
+    TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
+else
+    TOTAL_RAM_MB=$((MEM_BYTES / 1024 / 1024))
+fi
 
 if [ -z "$TOTAL_RAM_MB" ] || [ "$TOTAL_RAM_MB" -eq 0 ]; then
     TOTAL_RAM_MB=128
 fi
 
 if [ "$TOTAL_RAM_MB" -lt 160 ]; then
-    NODE_MEM=40
+    NODE_MEM=48
 elif [ "$TOTAL_RAM_MB" -lt 256 ]; then
-    NODE_MEM=64
+    NODE_MEM=80
 elif [ "$TOTAL_RAM_MB" -lt 320 ]; then
-    NODE_MEM=96
-elif [ "$TOTAL_RAM_MB" -lt 448 ]; then
     NODE_MEM=128
-elif [ "$TOTAL_RAM_MB" -lt 576 ]; then
+elif [ "$TOTAL_RAM_MB" -lt 448 ]; then
     NODE_MEM=160
+elif [ "$TOTAL_RAM_MB" -lt 576 ]; then
+    NODE_MEM=200
 else
     NODE_MEM=256
 fi
 
-echo "[INFO] 检测到系统内存: ${TOTAL_RAM_MB}MB | Node.js 堆上限设为: ${NODE_MEM}MB"
+echo "[INFO] 检测到系统/容器内存: ${TOTAL_RAM_MB}MB | Node.js 堆上限设为: ${NODE_MEM}MB"
 echo "[INFO] 启动 Argo + TUIC 主程序 (index.js)..."
 
 NODE_CMD="node --expose-gc --max-old-space-size=${NODE_MEM} index.js"
